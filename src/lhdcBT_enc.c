@@ -44,7 +44,13 @@ struct _lhdc_control_block {
 
 
 typedef struct _lhdc_control_block * lhdcBT;
+#ifndef LIMITED_MAX_BITRATE
 static int bitrate_array[] = {370, 380, 410, 460, 580, 900};
+#warning "Max target bit rate = 900"
+#else
+static int bitrate_array[] = {370, 380, 390, 410, 450, 600};
+#warning "Max target bit rate = 600"
+#endif
 #define BITRATE_ELEMENTS_SIZE   (sizeof(bitrate_array) / sizeof(int))
 #define BITRATE_AT_INDEX(x) bitrate_array[x]
 #define QUEUE_LENGTH_LEVEL   8
@@ -177,7 +183,11 @@ int lhdcBT_set_bitrate(HANDLE_LHDC_BT handle, int bitrate_inx){
                 break;
                 case LHDCBT_QUALITY_HIGH:
                 handle->qualityStatus = LHDCBT_QUALITY_HIGH;
+#ifndef LIMITED_MAX_BITRATE
                 handle->lastBitrate = 900;
+#else
+                handle->lastBitrate = 600;
+#endif
                 break;
                 case LHDCBT_QUALITY_AUTO:
                 handle->qualityStatus = LHDCBT_QUALITY_AUTO;
@@ -337,7 +347,11 @@ int lhdcBT_init_handle_encode(HANDLE_LHDC_BT handle,int sampling_freq, int bitPe
         break;
         case LHDCBT_QUALITY_HIGH:
         handle->qualityStatus = LHDCBT_QUALITY_HIGH;
+#ifndef LIMITED_MAX_BITRATE
         handle->lastBitrate = 900;
+#else
+        handle->lastBitrate = 600;
+#endif
         break;
         case LHDCBT_QUALITY_AUTO:
         handle->qualityStatus = LHDCBT_QUALITY_AUTO;
