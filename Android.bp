@@ -29,8 +29,7 @@ cc_library_shared {
     ],
     // -D_32BIT_FIXED_POINT should be added to cflags for devices without a FPU
     // unit such as ARM Cortex-R series or external 32-bit DSPs.
-    // -DLIMITED_MAX_BITRATE could be limited max target bitrate to 600.
-    cflags: ["-O2", "-Wall", "-Wextra", "-Wmacro-redefined", "-DLIMITED_MAX_BITRATE"],
+    cflags: ["-O2", "-Wall", "-Wextra", "-Wmacro-redefined"],
 
     shared_libs: [
         "libcutils",

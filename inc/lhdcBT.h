@@ -64,6 +64,8 @@ int lhdcBT_get_error_code(HANDLE_LHDC_BT handle);
 
 int lhdcBT_adjust_bitrate(HANDLE_LHDC_BT handle, size_t queueLength) ;
 
+void lhdcBT_setLimitBitRateEnabled(HANDLE_LHDC_BT handle, int enabled);
+
 #ifdef __cplusplus
 }
 #endif
