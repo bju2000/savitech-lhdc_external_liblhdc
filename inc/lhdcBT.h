@@ -58,7 +58,7 @@ int lhdcBT_set_bitrate(HANDLE_LHDC_BT handle, int bitrate_inx);
 
 int lhdcBT_get_sampling_freq(HANDLE_LHDC_BT handle);
 
-int lhdcBT_init_handle_encode(HANDLE_LHDC_BT hLhdcParam,int sampling_freq, int bitPerSample, int bitrate_inx);
+int lhdcBT_init_handle_encode(HANDLE_LHDC_BT hLhdcParam,int sampling_freq, int bitPerSample, int bitrate_inx, int dualChannel);
 
 int lhdcBT_get_error_code(HANDLE_LHDC_BT handle);
 

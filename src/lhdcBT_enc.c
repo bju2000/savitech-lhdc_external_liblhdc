@@ -62,9 +62,9 @@ static int bitrate_array[] = {370, 380, 390, 410, 450, 600};
 static int bitrateFromIndex(HANDLE_LHDC_BT handle, int index){
 	int bitrate_array_org[] = {370, 380, 410, 460, 580, 900};
 	int bitrate_array_small[] = {370, 380, 390, 410, 450, 600};
-	
+
 	return handle->limitBitRateEnabled == 0 ? bitrate_array_org[index] : bitrate_array_small[index];
-	
+
 }
 
 static int bitrateIndexFrom(size_t queueLength) {
@@ -106,9 +106,9 @@ void lhdcBT_setLimitBitRateEnabled(HANDLE_LHDC_BT handle, int enabled) {
 		return;
 	}
 	if (enabled != handle->limitBitRateEnabled){
-	
+
 		handle->limitBitRateEnabled = enabled;
-		
+
 		if (handle->limitBitRateEnabled != 0){
 			if (handle->lastBitrate >= 900)	{
                 handle->lastBitrate = 600;
@@ -307,7 +307,7 @@ int lhdcBT_adjust_bitrate(HANDLE_LHDC_BT handle, size_t queueLen) {
     return -1;
 }
 
-int lhdcBT_init_handle_encode(HANDLE_LHDC_BT handle,int sampling_freq, int bitPerSample, int bitrate_inx){
+int lhdcBT_init_handle_encode(HANDLE_LHDC_BT handle,int sampling_freq, int bitPerSample, int bitrate_inx, int dualChannel){
 
 
     handle->sampleRate = sampling_freq;
@@ -350,7 +350,7 @@ int lhdcBT_init_handle_encode(HANDLE_LHDC_BT handle,int sampling_freq, int bitPe
     ALOGD("%s: Init Encoder(%p) sampleRate = %d, bitrate = %d, bit per sample = %d",
      __func__, handle, handle->sampleRate, handle->lastBitrate, handle->bitPerSample);
     LossyEncoderInit(handle->fft_blk, handle->sampleRate, handle->bitPerSample, 2, LHDC_ENC_BLOCK_SIZE, 10 * 1024,
-                 (handle->lastBitrate * 1000) / 8, 0, 0);
+                 (handle->lastBitrate * 1000) / 8, 0, dualChannel);
     return 0;
 }
 
