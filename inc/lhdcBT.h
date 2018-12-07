@@ -33,14 +33,17 @@ typedef enum {
 } LHDCBT_SMPL_FMT_T;
 
 typedef enum name {
-    LHDCBT_QUALITY_LOW = 0,
+    LHDCBT_QUALITY_LOW0 = 0,
+    LHDCBT_QUALITY_LOW1,
+    LHDCBT_QUALITY_LOW2,
+    LHDCBT_QUALITY_LOW3,
+    LHDCBT_QUALITY_LOW4,
+    LHDCBT_QUALITY_LOW,
     LHDCBT_QUALITY_MID,
     LHDCBT_QUALITY_HIGH,
     LHDCBT_QUALITY_AUTO,
     LHDCBT_QUALITY_MAX
 } LHDCBT_QUALITY_T;
-
-#define LHDCBT_MAX_BLOCK_SIZE 512
 
 #define LHDCBT_ENC_BLOCK_SIZE  512
 
@@ -58,13 +61,13 @@ int lhdcBT_set_bitrate(HANDLE_LHDC_BT handle, int bitrate_inx);
 
 int lhdcBT_get_sampling_freq(HANDLE_LHDC_BT handle);
 
-int lhdcBT_init_handle_encode(HANDLE_LHDC_BT hLhdcParam,int sampling_freq, int bitPerSample, int bitrate_inx, int dualChannel);
+int lhdcBT_init_handle_encode(HANDLE_LHDC_BT hLhdcParam,int sampling_freq, int bitPerSample, int bitrate_inx, int dualChannel, int need_padding);
 
 int lhdcBT_get_error_code(HANDLE_LHDC_BT handle);
 
 int lhdcBT_adjust_bitrate(HANDLE_LHDC_BT handle, size_t queueLength) ;
 
-void lhdcBT_setLimitBitRateEnabled(HANDLE_LHDC_BT handle, int enabled);
+void lhdcBT_setLimitBitRate(HANDLE_LHDC_BT handle, int max_rate_index);
 
 #ifdef __cplusplus
 }

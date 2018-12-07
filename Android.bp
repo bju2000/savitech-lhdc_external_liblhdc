@@ -11,12 +11,19 @@ cc_prebuilt_library_shared {
             srcs: ["libs/arm64-v8a/liblhdc.so",],
         },
     },
+    
+        strip: {
+            none:true,
+        },
 }
 
 
 cc_library_shared {
     name: "liblhdcBT_enc",
-    vendor_available: true,
+   // vendor_available: true,
+   // vndk: {
+   //     enabled: true,
+   // },
     arch: {
         arm: {
             instruction_set: "arm",

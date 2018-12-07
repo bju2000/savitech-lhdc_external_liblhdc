@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include "lhdc_process.h"
 #include "lhdcBT.h"
@@ -34,7 +35,7 @@ struct _lhdc_control_block {
 
     int sampleRate;
     int bitPerSample;
-    int limitBitRateEnabled;
+    int limitBitRateStatus;
     int err;
 
     FILE * recFile;
@@ -46,6 +47,8 @@ struct _lhdc_control_block {
 
 typedef struct _lhdc_control_block * lhdcBT;
 
+static int bitRateTable[] = {64, 96, 128, 192, 256, 400, 500, 900, 1000/* auto */};
+
 /*
 #ifndef LIMITED_MAX_BITRATE
 static int bitrate_array[] = {370, 380, 410, 460, 580, 900};
@@ -55,15 +58,20 @@ static int bitrate_array[] = {370, 380, 390, 410, 450, 600};
 #warning "Max target bit rate = 600"
 #endif
 */
-#define BITRATE_ELEMENTS_SIZE   6
+#define BITRATE_ELEMENTS_SIZE   8
 #define QUEUE_LENGTH_LEVEL   8
 
 
 static int bitrateFromIndex(HANDLE_LHDC_BT handle, int index){
-	int bitrate_array_org[] = {370, 380, 410, 460, 580, 900};
-	int bitrate_array_small[] = {370, 380, 390, 410, 450, 600};
+	//int bitrate_array_org[] = {370, 380, 410, 460, 580, 900};
+	//int bitrate_array_small[] = {370, 380, 390, 410, 450, 600};
+    int bitrate_array_org[] = {64, 80, 100, 125, 180, 300, 500, 900};
+	//int bitrate_array_small[] = {64, 80, 100, 125, 180, 260, 400, 600};
 
-	return handle->limitBitRateEnabled == 0 ? bitrate_array_org[index] : bitrate_array_small[index];
+    int limit = bitRateTable[handle->limitBitRateStatus];
+
+    int result = bitrate_array_org[index];
+	return limit < result ? limit : result;
 
 }
 
@@ -100,18 +108,24 @@ static void reset_queue_length(HANDLE_LHDC_BT handle){
     handle->avgValue = 0;
 }
 
-void lhdcBT_setLimitBitRateEnabled(HANDLE_LHDC_BT handle, int enabled) {
-	if (handle == NULL){
-    	ALOGV("%s: Error LHDC instance(%p)",  __func__, handle);
+void lhdcBT_setLimitBitRate(HANDLE_LHDC_BT handle, int max_rate_index) {
+	if (handle == NULL || max_rate_index == LHDCBT_QUALITY_AUTO){
+    	ALOGV("%s: Error LHDC instance(%p), max rate(%d)",  __func__, handle, max_rate_index);
 		return;
 	}
-	if (enabled != handle->limitBitRateEnabled){
+	if (max_rate_index != handle->limitBitRateStatus){
 
-		handle->limitBitRateEnabled = enabled;
+		handle->limitBitRateStatus = max_rate_index;
 
-		if (handle->limitBitRateEnabled != 0){
-			if (handle->lastBitrate >= 900)	{
-                handle->lastBitrate = 600;
+		if (handle->limitBitRateStatus != (LHDCBT_QUALITY_T)handle->qualityStatus ){
+            if (handle->qualityStatus != LHDCBT_QUALITY_AUTO) {
+                handle->qualityStatus = handle->limitBitRateStatus;
+            }
+
+            int newRate = bitRateTable[handle->limitBitRateStatus];
+
+			if (handle->lastBitrate >= newRate)	{
+                handle->lastBitrate = newRate;
         		LossyEncoderSetTargetByteRate(handle->fft_blk, (handle->lastBitrate * 1000) / 8);
         		ALOGD("%s: Update bitrate(%d)",  __func__, handle->lastBitrate);
 			}
@@ -121,7 +135,7 @@ void lhdcBT_setLimitBitRateEnabled(HANDLE_LHDC_BT handle, int enabled) {
 
 HANDLE_LHDC_BT lhdcBT_get_handle(){
     lhdcBT handle = malloc(sizeof(struct _lhdc_control_block));
-    memset(handle, 0, sizeof(struct _lhdc_control_block));
+    memset((void*)handle, 0, sizeof(struct _lhdc_control_block));
 
     handle->fft_blk = LossyEncoderNew();
     if (handle->fft_blk == NULL) {
@@ -132,7 +146,7 @@ HANDLE_LHDC_BT lhdcBT_get_handle(){
     handle->lastBitrate = 560;
     handle->sampleRate = 96000;
     handle->bitPerSample = 24;
-    handle->limitBitRateEnabled = 0;
+    handle->limitBitRateStatus = LHDCBT_QUALITY_HIGH;
     reset_queue_length(handle);
     //handle->recFile = fopen("/sdcard/Download/record.lhdc", "wb+");
     handle->recFile = NULL;
@@ -198,38 +212,23 @@ int lhdcBT_get_sampling_freq(HANDLE_LHDC_BT handle){
 
 int lhdcBT_set_bitrate(HANDLE_LHDC_BT handle, int bitrate_inx){
     if (handle) {
+
         if (bitrate_inx != handle->qualityStatus) {
-            switch ((LHDCBT_QUALITY_T)bitrate_inx) {
-                default:
-                case LHDCBT_QUALITY_LOW:
-                handle->qualityStatus = LHDCBT_QUALITY_LOW;
+
+            if (bitrate_inx != LHDCBT_QUALITY_AUTO) {
+                handle->lastBitrate = bitRateTable[bitrate_inx];
+            }else{
                 handle->lastBitrate = 400;
-                break;
-                case LHDCBT_QUALITY_MID:
-                handle->qualityStatus = LHDCBT_QUALITY_MID;
-                handle->lastBitrate = 500;
-                if (handle->bitPerSample == 24) {
-                    handle->lastBitrate = 560;
-                }
-                break;
-                case LHDCBT_QUALITY_HIGH:
-                handle->qualityStatus = LHDCBT_QUALITY_HIGH;
-                if (handle->limitBitRateEnabled == 0) {
-                    handle->lastBitrate = 900;
-                }else{
-                    handle->lastBitrate = 600;
-                }
-                break;
-                case LHDCBT_QUALITY_AUTO:
-                handle->qualityStatus = LHDCBT_QUALITY_AUTO;
-                if (!handle->lastBitrate) {
-                    handle->lastBitrate = 400;
-                }
-                //handle->changeBRCnt = 0;
-                //reset_queue_length(handle);
                 resetDnBRParam(handle);
                 resetUpBRParam(handle);
-                break;
+            }
+
+            handle->qualityStatus = bitrate_inx;
+
+            if (handle->qualityStatus > (LHDCBT_QUALITY_T)handle->limitBitRateStatus &&
+                handle->qualityStatus != LHDCBT_QUALITY_AUTO) {
+                handle->lastBitrate = bitRateTable[handle->limitBitRateStatus];
+                handle->qualityStatus = handle->limitBitRateStatus;
             }
         }
         LossyEncoderSetTargetByteRate(handle->fft_blk, (handle->lastBitrate * 1000) / 8);
@@ -252,24 +251,14 @@ int lhdcBT_adjust_bitrate(HANDLE_LHDC_BT handle, size_t queueLen) {
             handle->dnBitrateSum = 0;
             handle->dnBitrateCnt = 0;
             int newBitrateInx = bitrateIndexFrom(queueLength);
-            ALOGD("%s:[Down BiTrAtE] queuSumTmp(%d) / queuCntTmp(%d) = queueLength(%d)",  __func__, queuSumTmp, queuCntTmp, queueLength);
+            ALOGD("%s:[Down BiTrAtE] queuSumTmp(%d) / queuCntTmp(%d) = queueLength(%zu)",  __func__, queuSumTmp, queuCntTmp, queueLength);
             ALOGD("%s:[Down BiTrAtE] current bitrate(%d) bitrate_array[%d] = %d",  __func__, handle->lastBitrate, newBitrateInx, bitrateFromIndex(handle, newBitrateInx));
             if (bitrateFromIndex(handle, newBitrateInx) < handle->lastBitrate) {
                 handle->lastBitrate = bitrateFromIndex(handle, newBitrateInx);
                 LossyEncoderSetTargetByteRate(handle->fft_blk, (handle->lastBitrate * 1000) / 8);
                 ALOGD("%s:[Down BiTrAtE] Update bitrate(%d), queue length(%zu)",  __func__, handle->lastBitrate, queueLength);
                 resetUpBRParam(handle);
-
-            }   /*else if (bitrateFromIndex(handle, newBitrateInx) > handle->lastBitrate && queuSumTmp > 0){
-                size_t currentInx = indexOfBitrate(handle, handle->lastBitrate);
-                if (currentInx > 0) {
-                    currentInx--;
-                    handle->lastBitrate = bitrateFromIndex(handle, currentInx);
-                    LossyEncoderSetTargetByteRate(handle->fft_blk, (handle->lastBitrate * 1000) / 8);
-                    ALOGD("%s:[Down BiTrAtE] Update bitrate(%d), queuSumTmp(%d)",  __func__, handle->lastBitrate, queuSumTmp);
-                    resetUpBRParam(handle);
-                }
-            }*/
+            }
         }
 
         if (handle->upBitrateCnt >= 400) {
@@ -280,7 +269,7 @@ int lhdcBT_adjust_bitrate(HANDLE_LHDC_BT handle, size_t queueLen) {
             handle->upBitrateSum = 0;
             handle->upBitrateCnt = 0;
             int newBitrateInx = bitrateIndexFrom(queueLength);
-            ALOGD("%s:[Up BiTrAtE] queuSumTmp(%d) / queuCntTmp(%d) = queueLength(%d)",  __func__, queuSumTmp, queuCntTmp, queueLength);
+            ALOGD("%s:[Up BiTrAtE] queuSumTmp(%d) / queuCntTmp(%d) = queueLength(%zu)",  __func__, queuSumTmp, queuCntTmp, queueLength);
             ALOGD("%s:[Up BiTrAtE] current bitrate(%d) bitrate_array[%d] = %d",  __func__, handle->lastBitrate, newBitrateInx, bitrateFromIndex(handle, newBitrateInx));
             if (bitrateFromIndex(handle, newBitrateInx) > handle->lastBitrate && queuSumTmp == 0) {
                 size_t currentInx = indexOfBitrate(handle, handle->lastBitrate);
@@ -288,6 +277,7 @@ int lhdcBT_adjust_bitrate(HANDLE_LHDC_BT handle, size_t queueLen) {
                     currentInx++;
                 }
                 handle->lastBitrate = bitrateFromIndex(handle, currentInx);
+
                 LossyEncoderSetTargetByteRate(handle->fft_blk, (handle->lastBitrate * 1000) / 8);
                 ALOGD("%s:[Up BiTrAtE] Update bitrate(%d), queue length(%zu)",  __func__, handle->lastBitrate, queueLength);
                 resetDnBRParam(handle);
@@ -307,50 +297,33 @@ int lhdcBT_adjust_bitrate(HANDLE_LHDC_BT handle, size_t queueLen) {
     return -1;
 }
 
-int lhdcBT_init_handle_encode(HANDLE_LHDC_BT handle,int sampling_freq, int bitPerSample, int bitrate_inx, int dualChannel){
+int lhdcBT_init_handle_encode(HANDLE_LHDC_BT handle,int sampling_freq, int bitPerSample, int bitrate_inx, int dualChannel, int need_padding){
 
 
     handle->sampleRate = sampling_freq;
     handle->bitPerSample = bitPerSample;
 
     //encHandle->targetBitrate = bitrate;
-    switch ((LHDCBT_QUALITY_T)bitrate_inx) {
-        default:
-        case LHDCBT_QUALITY_LOW:
-        handle->qualityStatus = LHDCBT_QUALITY_LOW;
+    if (bitrate_inx != LHDCBT_QUALITY_AUTO) {
+        handle->lastBitrate = bitRateTable[bitrate_inx];
+    }else{
         handle->lastBitrate = 400;
-        break;
-        case LHDCBT_QUALITY_MID:
-        handle->qualityStatus = LHDCBT_QUALITY_MID;
-        handle->lastBitrate = 500;
-        if (bitPerSample == 24) {
-            handle->lastBitrate = 560;
-        }
-        break;
-        case LHDCBT_QUALITY_HIGH:
-        handle->qualityStatus = LHDCBT_QUALITY_HIGH;
-        if (handle->limitBitRateEnabled == 0) {
-            handle->lastBitrate = 900;
-        }else{
-            handle->lastBitrate = 600;
-        }
-        break;
-        case LHDCBT_QUALITY_AUTO:
-        handle->qualityStatus = LHDCBT_QUALITY_AUTO;
-        if (!handle->lastBitrate) {
-            handle->lastBitrate = 400;
-        }
-        //handle->changeBRCnt = 0;
-        //reset_queue_length(handle);
         resetDnBRParam(handle);
         resetUpBRParam(handle);
-        break;
+    }
+
+    handle->qualityStatus = bitrate_inx;
+
+    if (handle->qualityStatus > (LHDCBT_QUALITY_T)handle->limitBitRateStatus &&
+        handle->qualityStatus != LHDCBT_QUALITY_AUTO) {
+        handle->lastBitrate = bitRateTable[handle->limitBitRateStatus];
+        handle->qualityStatus = handle->limitBitRateStatus;
     }
 
     ALOGD("%s: Init Encoder(%p) sampleRate = %d, bitrate = %d, bit per sample = %d",
      __func__, handle, handle->sampleRate, handle->lastBitrate, handle->bitPerSample);
-    LossyEncoderInit(handle->fft_blk, handle->sampleRate, handle->bitPerSample, 2, LHDC_ENC_BLOCK_SIZE, 10 * 1024,
-                 (handle->lastBitrate * 1000) / 8, 0, dualChannel);
+    LossyEncoderInit(handle->fft_blk, handle->sampleRate, handle->bitPerSample, 2, LHDCBT_ENC_BLOCK_SIZE, 10 * 1024,
+                 (handle->lastBitrate * 1000) / 8, 0, dualChannel, need_padding);
     return 0;
 }
 
